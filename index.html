@@ -340,24 +340,24 @@
   var CULTURE_STATUSES = ["Pending", "Resulted"];
   var RESP_MODES = ["", "Mechanical Ventilation", "BiPAP/CPAP", "Optiflow/High-Flow", "Nasal Prongs/Oxymask"];
 
-  // IV Critical Care Medications — checkable items with a free-text note for rate/titration,
-  // guidance drawn from the RVH Cardiac & Critical Care Code Card.
+  // IV Critical Care Medications — checkable items with a dose-entry field (units shown as a hint,
+  // not a full protocol) for the currently running rate.
   var IV_MEDS_GROUPS = [
     { label: "Sedatives", items: [
-      { id: "ivm-propofol", t: "Propofol", n: "RVH 10–20 mcg/kg/min (max 50); ↑ by 0.3–0.6 mg/kg/h. Onset ~30 sec. Watch hypotension, bradycardia; DOA prolonged after multi-day infusion." },
-      { id: "ivm-fentanyl", t: "Fentanyl (infusion)", n: "RVH PPO 25–200 mcg/hr (start ~1 mcg/kg/hr); upper limit usually 300 mcg/hr; titrate q30min+. Watch hypotension, bradycardia, withdrawal if >7 days." },
-      { id: "ivm-dex", t: "Dexmedetomidine", n: "0.2–0.7 mcg/kg/hr (RVH start 0.2, max 1.4); titrate no faster than q30min. Avoid if HR<55, 2°/3° block, severe hepatic failure, EF<20%. Limit to ≤24h if possible; watch withdrawal if abrupt d/c." },
+      { id: "ivm-propofol", t: "Propofol", unit: "mcg/kg/min" },
+      { id: "ivm-fentanyl", t: "Fentanyl (infusion)", unit: "mcg/hr" },
+      { id: "ivm-dex", t: "Dexmedetomidine", unit: "mcg/kg/hr" },
     ]},
     { label: "Vasopressors", items: [
-      { id: "ivm-norepi", t: "Norepinephrine", n: "RVH protocol 0.03–3 mcg/kg/min (rarely >1 mcg/kg/min). Consider adding a 2nd pressor at 0.2–0.5 mcg/kg/min." },
-      { id: "ivm-vaso", t: "Vasopressin", n: "Fixed infusion 1.8–2.4 units/hr (0.03–0.04 units/min); standard 40 units/100 mL. Not typically titrated." },
+      { id: "ivm-norepi", t: "Norepinephrine", unit: "mcg/kg/min" },
+      { id: "ivm-vaso", t: "Vasopressin", unit: "units/hr" },
     ]},
     { label: "Cardiac", items: [
-      { id: "ivm-amio", t: "Amiodarone (IV)", n: "Arrest: 300 mg bolus → 1 mg/min ×6h → 0.5 mg/min ×18h. Antiarrhythmic effect can take 2–3 days. Needs 0.2-micron inline filter; peripheral OK ×24h then central access." },
-      { id: "ivm-milrinone", t: "Milrinone", n: "0.125–0.75 mcg/kg/min (max 1.13 mg/kg/day); reduce dose in renal dysfunction; do not mix with furosemide." },
-      { id: "ivm-dobut", t: "Dobutamine", n: "2.5–10 mcg/kg/min (may increase to 40); onset 1–10 min. DOC for cardiogenic shock/sepsis with low CO." },
-      { id: "ivm-ntg", t: "IV Nitroglycerin", n: "Initial 15 mcg/min, ↑ by 5 mcg/min q3–5min. Max: SBP <90 or drop >20 mmHg from baseline. Requires non-PVC tubing." },
-      { id: "ivm-heparin", t: "IV Heparin", n: "Weight-based nomogram — confirm standard treatment-dose vs lower-intensity ACS/cardiac protocol; bolus + initial rate per RVH weight bands (25,000 units/500 mL = 50 units/mL)." },
+      { id: "ivm-amio", t: "Amiodarone (IV)", unit: "mg/min" },
+      { id: "ivm-milrinone", t: "Milrinone", unit: "mcg/kg/min" },
+      { id: "ivm-dobut", t: "Dobutamine", unit: "mcg/kg/min" },
+      { id: "ivm-ntg", t: "IV Nitroglycerin", unit: "mcg/min" },
+      { id: "ivm-heparin", t: "IV Heparin", unit: "units/hr" },
     ]},
   ];
 
@@ -646,11 +646,12 @@
 
   function roundsItemHtml(pid, item, checked, showHint, notes){
     var noteVal = (notes && notes[item.id]) || "";
+    var notePlaceholder = item.unit ? "dose (" + item.unit + ")" : "note (e.g. reason if held)";
     return '<div class="rounds-item">' +
       '<input type="checkbox" id="rchk-' + pid + '-' + item.id + '" data-pid="' + pid + '" data-item="' + item.id + '" ' + (checked ? "checked" : "") + '>' +
       '<label for="rchk-' + pid + '-' + item.id + '">' + escapeHtml(item.t) + (item.n ? '<span class="note">' + escapeHtml(item.n) + '</span>' : '') + '</label>' +
       (showHint ? '<span class="prev-hint" data-carry-item="' + pid + '|' + item.id + '" title="Checked on a previous day — click to confirm for today">✓ prior</span>' : '') +
-      '<input type="text" class="item-note-input" placeholder="note (e.g. reason if held)" value="' + escapeHtml(noteVal) + '" data-item-note="' + pid + '|' + item.id + '">' +
+      '<input type="text" class="item-note-input" placeholder="' + escapeHtml(notePlaceholder) + '" value="' + escapeHtml(noteVal) + '" data-item-note="' + pid + '|' + item.id + '">' +
     '</div>';
   }
 
@@ -1055,6 +1056,21 @@
       " at " + now.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
   }
 
+  // Currently-checked IV Critical Care Medications with their entered dose, for pulling into print/export.
+  function activeIvMeds(p){
+    var todayChecks = getTodayChecks(p);
+    var active = [];
+    IV_MEDS_GROUPS.forEach(function(g){
+      g.items.forEach(function(item){
+        if(todayChecks[item.id]){
+          var dose = p.itemNotes[item.id];
+          active.push(item.t + (dose ? " — " + dose : ""));
+        }
+      });
+    });
+    return active;
+  }
+
   function buildPatientBlockHtml(p){
     var openTasks = p.tasks.filter(function(t){ return !t.done; })
       .sort(function(a,b){ return (a.due||"9999").localeCompare(b.due||"9999"); });
@@ -1118,6 +1134,10 @@
         html += '<li>' + escapeHtml(bits.join(" · ")) + '</li>';
       });
       html += '</ul></div>';
+    }
+    if(p.focus.iv_meds){
+      var ivMedsBits = activeIvMeds(p);
+      if(ivMedsBits.length) html += '<p class="print-dim" style="margin:2px 0 0 0;">IV Critical Care Meds: ' + ivMedsBits.map(escapeHtml).join("; ") + '</p>';
     }
     if(p.focus.resp_support && (p.respMode || p.respSettings)){
       html += '<p class="print-dim" style="margin:2px 0 0 0;">Respiratory: ' + [p.respMode, p.respSettings].filter(Boolean).map(escapeHtml).join(" · ") + '</p>';
@@ -1318,6 +1338,10 @@
       if(p.abxDuration) abxBits.push(escapeHtml(p.abxDuration));
       if(p.abxStopDate) abxBits.push("ASO " + formatDue(p.abxStopDate));
       focusParts.push("<div><strong>Abx:</strong> " + abxBits.join(" · ") + "</div>");
+    }
+    if(p.focus.iv_meds){
+      var ivMedsBits = activeIvMeds(p);
+      if(ivMedsBits.length) focusParts.push("<div><strong>IV Meds:</strong> " + ivMedsBits.map(escapeHtml).join(", ") + "</div>");
     }
     if(p.focus.resp_support && p.respMode){
       focusParts.push("<div><strong>Resp:</strong> " + escapeHtml(p.respMode) + "</div>");
