@@ -145,6 +145,8 @@
     border:1px solid rgba(45,212,191,0.3); border-radius:10px; padding:2px 8px; cursor:pointer; white-space:nowrap; flex-shrink:0;}
   .prev-hint:hover{opacity:0.8;}
   .item-note-input{font-size:12px; padding:5px 8px; width:160px; flex-shrink:0; margin-left:25px;}
+  .item-dose-input{width:80px; margin-left:25px;}
+  .item-note-unit{font-size:11px; color:var(--text-dim); flex-shrink:0; white-space:nowrap; margin-left:-5px;}
   .rounds-footer-row{display:flex; justify-content:flex-end; gap:6px; margin-top:12px; flex-wrap:wrap;}
 
   /* ---------- Multi-row pickers (IV->PO, Cultures) ---------- */
@@ -239,7 +241,6 @@
         <input type="text" id="rp-name" placeholder="Name / Initials" style="flex:2; min-width:130px;">
         <input type="text" id="rp-room" placeholder="Room / Bed" style="flex:1; min-width:90px;">
         <input type="text" id="rp-dx" placeholder="Diagnosis / RFA" style="flex:2; min-width:150px;">
-        <input type="number" id="rp-ef" placeholder="EF %" style="flex:0 0 80px;">
         <button class="btn" id="rounds-add-btn">+ Add Patient</button>
       </div>
       <div style="font-size:11.5px; color:var(--text-dim); margin-top:8px;">Patients stay on this list day to day &mdash; remove only when discharged or transferred out of ICU. Review checklist items reset each day but show a hint if confirmed the day before.</div>
@@ -305,12 +306,13 @@
       if(!p.checksByDate) p.checksByDate = {};
       if(!p.coreChecks) p.coreChecks = {};
       if(p.dx === undefined) p.dx = "";
-      if(p.ef === undefined) p.ef = "";
       if(!p.ivpoRows) p.ivpoRows = [];
       if(p.abxStopDate === undefined) p.abxStopDate = "";
       if(p.abxDuration === undefined) p.abxDuration = "";
       if(!p.cultures) p.cultures = [];
       if(p.respMode === undefined) p.respMode = "";
+      if(p.respFio2 === undefined) p.respFio2 = "";
+      if(p.respPeep === undefined) p.respPeep = "";
       if(p.respSettings === undefined) p.respSettings = "";
       ["workupPresenting", "workupPmh", "workupInfusions", "workupNeuro",
         "workupCvRhythm", "workupCvRate", "workupCvBp", "workupCvLabs", "workupCvCath", "workupCvEcho", "workupCvHemo",
@@ -345,7 +347,7 @@
   var IV_MEDS_GROUPS = [
     { label: "Sedatives", items: [
       { id: "ivm-propofol", t: "Propofol", unit: "mcg/kg/min" },
-      { id: "ivm-fentanyl", t: "Fentanyl (infusion)", unit: "mcg/hr" },
+      { id: "ivm-fentanyl", t: "Fentanyl", unit: "mcg/hr" },
       { id: "ivm-dex", t: "Dexmedetomidine", unit: "mcg/kg/hr" },
     ]},
     { label: "Vasopressors", items: [
@@ -353,11 +355,11 @@
       { id: "ivm-vaso", t: "Vasopressin", unit: "units/hr" },
     ]},
     { label: "Cardiac", items: [
-      { id: "ivm-amio", t: "Amiodarone (IV)", unit: "mg/min" },
+      { id: "ivm-amio", t: "Amiodarone", unit: "mg/min" },
       { id: "ivm-milrinone", t: "Milrinone", unit: "mcg/kg/min" },
       { id: "ivm-dobut", t: "Dobutamine", unit: "mcg/kg/min" },
-      { id: "ivm-ntg", t: "IV Nitroglycerin", unit: "mcg/min" },
-      { id: "ivm-heparin", t: "IV Heparin", unit: "units/hr" },
+      { id: "ivm-ntg", t: "Nitroglycerin", unit: "mcg/min" },
+      { id: "ivm-heparin", t: "Heparin", unit: "units/hr" },
     ]},
   ];
 
@@ -458,22 +460,21 @@
     var nameEl = document.getElementById("rp-name");
     var roomEl = document.getElementById("rp-room");
     var dxEl = document.getElementById("rp-dx");
-    var efEl = document.getElementById("rp-ef");
     var name = nameEl.value.trim();
     if(!name) return;
     var p = {
-      id: uid(), name: name, room: roomEl.value.trim(), dx: dxEl.value.trim(), ef: efEl.value.trim(),
+      id: uid(), name: name, room: roomEl.value.trim(), dx: dxEl.value.trim(),
       tasks: [], focus: {}, crcl: "", coreChecks: {},
       tdmAgent: "", tdmNextTrough: "", tdmTarget: "", tdmFrequency: "", a1cLevel: "", a1cChanges: "",
       itemNotes: {}, checksByDate: {},
-      ivpoRows: [], abxStopDate: "", abxDuration: "", cultures: [], respMode: "", respSettings: "",
+      ivpoRows: [], abxStopDate: "", abxDuration: "", cultures: [], respMode: "", respFio2: "", respPeep: "", respSettings: "",
       workupPresenting: "", workupPmh: "", workupInfusions: "", workupNeuro: "",
       workupCvRhythm: "", workupCvRate: "", workupCvBp: "", workupCvLabs: "", workupCvCath: "", workupCvEcho: "", workupCvHemo: "",
       workupResp: "", workupGi: "", workupGu: "", workupGlycemic: "", workupHeme: "", workupId: "",
       workupHomeMeds: ""
     };
     state.patients.unshift(p);
-    nameEl.value = ""; roomEl.value = ""; dxEl.value = ""; efEl.value = "";
+    nameEl.value = ""; roomEl.value = ""; dxEl.value = "";
     saveState();
     renderPatients();
   }
@@ -646,12 +647,13 @@
 
   function roundsItemHtml(pid, item, checked, showHint, notes){
     var noteVal = (notes && notes[item.id]) || "";
-    var notePlaceholder = item.unit ? "dose (" + item.unit + ")" : "note (e.g. reason if held)";
+    var notePlaceholder = item.unit ? "dose" : "note (e.g. reason if held)";
     return '<div class="rounds-item">' +
       '<input type="checkbox" id="rchk-' + pid + '-' + item.id + '" data-pid="' + pid + '" data-item="' + item.id + '" ' + (checked ? "checked" : "") + '>' +
       '<label for="rchk-' + pid + '-' + item.id + '">' + escapeHtml(item.t) + (item.n ? '<span class="note">' + escapeHtml(item.n) + '</span>' : '') + '</label>' +
       (showHint ? '<span class="prev-hint" data-carry-item="' + pid + '|' + item.id + '" title="Checked on a previous day — click to confirm for today">✓ prior</span>' : '') +
-      '<input type="text" class="item-note-input" placeholder="' + escapeHtml(notePlaceholder) + '" value="' + escapeHtml(noteVal) + '" data-item-note="' + pid + '|' + item.id + '">' +
+      '<input type="text" class="item-note-input' + (item.unit ? ' item-dose-input' : '') + '" placeholder="' + escapeHtml(notePlaceholder) + '" value="' + escapeHtml(noteVal) + '" data-item-note="' + pid + '|' + item.id + '">' +
+      (item.unit ? '<span class="item-note-unit">' + escapeHtml(item.unit) + '</span>' : '') +
     '</div>';
   }
 
@@ -741,29 +743,47 @@
   }
 
   // Creates a follow-up task for each currently-unchecked core/active-focus-area item,
-  // skipping items that already have an open (not done) auto-generated task.
+  // skipping items that already have an open (not done) auto-generated task. IV Critical Care
+  // Medications work the opposite way — a checked (currently running) drip is what needs ongoing
+  // follow-up/reassessment, not an unchecked one — so that area flags followUpWhenChecked.
+  // Pending cultures also generate a follow-up (to check back once resulted) even though they
+  // aren't a checklist item.
   function addFollowUpsForUnchecked(pid){
     var p = state.patients.find(function(p){ return p.id === pid; });
     if(!p) return;
     var today = getTodayChecks(p);
-    var candidates = ROUNDS_CORE_ITEMS.map(function(item){ return { item: item, area: "Core Review", checked: !!p.coreChecks[item.id] }; });
+    var candidates = ROUNDS_CORE_ITEMS.map(function(item){ return { item: item, area: "Core Review", checked: !!p.coreChecks[item.id], followUpWhenChecked: false }; });
     Object.keys(ROUNDS_FOCUS_AREAS).forEach(function(key){
       if(p.focus[key]){
         var area = ROUNDS_FOCUS_AREAS[key];
-        area.items.forEach(function(item){ candidates.push({ item: item, area: area.label, checked: !!today[item.id] }); });
+        var followUpWhenChecked = key === "iv_meds";
+        area.items.forEach(function(item){ candidates.push({ item: item, area: area.label, checked: !!today[item.id], followUpWhenChecked: followUpWhenChecked }); });
       }
     });
 
     var openSourceIds = p.tasks.filter(function(t){ return !t.done; }).map(function(t){ return t.sourceItem; });
     var added = 0;
     candidates.forEach(function(c){
-      if(c.checked) return;
+      var wantsFollowUp = c.followUpWhenChecked ? c.checked : !c.checked;
+      if(!wantsFollowUp) return;
       if(openSourceIds.indexOf(c.item.id) !== -1) return;
       var note = p.itemNotes[c.item.id];
       var text = c.area + ": " + c.item.t + (note ? " — " + note : "");
       p.tasks.push({ id: uid(), text: text, due: "", priority: "routine", done: false, sourceItem: c.item.id });
       added++;
     });
+
+    if(p.focus.abx && p.cultures){
+      p.cultures.forEach(function(c){
+        if(c.status !== "Pending") return;
+        var sourceId = "cx-" + c.id;
+        if(openSourceIds.indexOf(sourceId) !== -1) return;
+        var label = c.site || "Culture";
+        var text = "Antibiotics: " + label + " culture pending" + (c.organism ? " (organism: " + c.organism + ")" : "");
+        p.tasks.push({ id: uid(), text: text, due: "", priority: "routine", done: false, sourceItem: sourceId });
+        added++;
+      });
+    }
 
     if(added === 0){
       alert("Nothing to add — all reviewed items are checked, or already have an open follow-up.");
@@ -827,7 +847,7 @@
             '<div class="rounds-field"><label>Mode</label><select data-field="respMode" data-pid="' + p.id + '">' +
               RESP_MODES.map(function(m){ return '<option value="' + escapeHtml(m) + '"' + (p.respMode === m ? " selected" : "") + '>' + (m || "— Select —") + '</option>'; }).join("") +
             '</select></div>' +
-            '<div class="rounds-field" style="flex:1; min-width:200px;"><label>Settings / Details</label><input type="text" value="' + escapeHtml(p.respSettings) + '" data-field="respSettings" data-pid="' + p.id + '" placeholder="e.g. FiO2 40%, PEEP 5, PS 10" style="width:100%;"></div>' +
+            '<div class="rounds-field" style="flex:1; min-width:200px;"><label>Other Settings / Details</label><input type="text" value="' + escapeHtml(p.respSettings) + '" data-field="respSettings" data-pid="' + p.id + '" placeholder="e.g. PS 10, rate 14..." style="width:100%;"></div>' +
           '</div>' +
         '</div>';
         return;
@@ -878,7 +898,8 @@
           '<span class="patient-name">' + escapeHtml(p.name) + '</span>' +
           (p.room ? '<span class="patient-meta"> Room ' + escapeHtml(p.room) + '</span>' : '') +
           (p.dx ? '<span class="patient-meta"> · ' + escapeHtml(p.dx) + '</span>' : '') +
-          (p.ef ? '<span class="patient-meta"> · EF ' + escapeHtml(p.ef) + '%</span>' : '') +
+          (p.respFio2 ? '<span class="patient-meta"> · FiO2 ' + escapeHtml(p.respFio2) + '%</span>' : '') +
+          (p.respPeep ? '<span class="patient-meta"> · PEEP ' + escapeHtml(p.respPeep) + '</span>' : '') +
         '</div>' +
         '<div class="patient-badges">' +
           '<span class="badge ' + rBadge.cls + '">' + rBadge.label + '</span>' +
@@ -889,7 +910,8 @@
         '<div class="rounds-head-row">' +
           '<div class="rounds-field"><label>Room</label><input type="text" value="' + escapeHtml(p.room) + '" data-field="room" data-pid="' + p.id + '" style="width:80px;"></div>' +
           '<div class="rounds-field"><label>Diagnosis</label><input type="text" value="' + escapeHtml(p.dx) + '" data-field="dx" data-pid="' + p.id + '" style="width:200px;"></div>' +
-          '<div class="rounds-field"><label>EF %</label><input type="number" value="' + escapeHtml(p.ef) + '" data-field="ef" data-pid="' + p.id + '" style="width:70px;"></div>' +
+          '<div class="rounds-field"><label>FiO2 %</label><input type="number" value="' + escapeHtml(p.respFio2) + '" data-field="respFio2" data-pid="' + p.id + '" style="width:70px;"></div>' +
+          '<div class="rounds-field"><label>PEEP</label><input type="number" value="' + escapeHtml(p.respPeep) + '" data-field="respPeep" data-pid="' + p.id + '" style="width:65px;"></div>' +
           '<div class="rounds-field"><label>CrCl</label><input type="text" value="' + escapeHtml(p.crcl) + '" data-field="crcl" data-pid="' + p.id + '" style="width:65px;"></div>' +
           '<div class="rounds-field"><label>A1C</label><input type="text" value="' + escapeHtml(p.a1cLevel) + '" data-field="a1cLevel" data-pid="' + p.id + '" style="width:65px;"></div>' +
         '</div>' +
@@ -1064,7 +1086,7 @@
       g.items.forEach(function(item){
         if(todayChecks[item.id]){
           var dose = p.itemNotes[item.id];
-          active.push(item.t + (dose ? " — " + dose : ""));
+          active.push(item.t + (dose ? " — " + dose + " " + item.unit : ""));
         }
       });
     });
@@ -1082,7 +1104,8 @@
     var metaBits = [];
     if(p.room) metaBits.push("Room " + p.room);
     if(p.dx) metaBits.push(p.dx);
-    if(p.ef) metaBits.push("EF " + p.ef + "%");
+    if(p.respFio2) metaBits.push("FiO2 " + p.respFio2 + "%");
+    if(p.respPeep) metaBits.push("PEEP " + p.respPeep);
     if(metaBits.length) html += '<div class="print-patient-room">' + escapeHtml(metaBits.join(" · ")) + '</div>';
     html += '</div>';
 
@@ -1097,7 +1120,6 @@
     html += '</ul>';
     var vitalsBits = [];
     if(p.crcl) vitalsBits.push("CrCl " + escapeHtml(p.crcl));
-    if(p.a1cLevel) vitalsBits.push("A1C " + escapeHtml(p.a1cLevel));
     if(vitalsBits.length) html += '<p class="print-dim" style="margin:6px 0 0 0;">' + vitalsBits.join(" · ") + '</p>';
     if(p.ivpoRows && p.ivpoRows.length){
       var ivpoBits = p.ivpoRows.map(function(r){
@@ -1208,7 +1230,8 @@
     var metaBits = [];
     if(p.room) metaBits.push("Room " + p.room);
     if(p.dx) metaBits.push(p.dx);
-    if(p.ef) metaBits.push("EF " + p.ef + "%");
+    if(p.respFio2) metaBits.push("FiO2 " + p.respFio2 + "%");
+    if(p.respPeep) metaBits.push("PEEP " + p.respPeep);
     if(metaBits.length) html += '<div class="print-patient-room">' + escapeHtml(metaBits.join(" · ")) + '</div>';
     html += '</div>';
 
@@ -1321,7 +1344,6 @@
     var vte = !!p.coreChecks.vte;
     var sup = !!p.coreChecks.stressulcer;
     var crclCell = p.crcl ? escapeHtml(p.crcl) : "—";
-    var a1cCell = p.a1cLevel ? escapeHtml(p.a1cLevel) : "—";
     var focusParts = [];
     if(p.focus.tdm){
       var tdmBits = [];
@@ -1338,6 +1360,14 @@
       if(p.abxDuration) abxBits.push(escapeHtml(p.abxDuration));
       if(p.abxStopDate) abxBits.push("ASO " + formatDue(p.abxStopDate));
       focusParts.push("<div><strong>Abx:</strong> " + abxBits.join(" · ") + "</div>");
+    }
+    if(p.focus.abx && p.cultures && p.cultures.length){
+      var cxBits = p.cultures.map(function(c){
+        var bits = [c.site || "Culture", c.status || "Pending"];
+        if(c.organism) bits.push(c.organism);
+        return bits.join(" ");
+      });
+      focusParts.push("<div><strong>Cultures:</strong> " + cxBits.map(escapeHtml).join("; ") + "</div>");
     }
     if(p.focus.iv_meds){
       var ivMedsBits = activeIvMeds(p);
@@ -1356,12 +1386,11 @@
     return '<tr>' +
       '<td>' + escapeHtml(p.room || "—") + '</td>' +
       '<td>' + escapeHtml(p.name) + '</td>' +
-      '<td>' + escapeHtml(p.dx || "—") + (p.ef ? ' <span class="print-dim">(EF ' + escapeHtml(p.ef) + '%)</span>' : '') + '</td>' +
+      '<td>' + escapeHtml(p.dx || "—") + ((p.respFio2 || p.respPeep) ? ' <span class="print-dim">(' + [p.respFio2 ? "FiO2 " + escapeHtml(p.respFio2) + "%" : null, p.respPeep ? "PEEP " + escapeHtml(p.respPeep) : null].filter(Boolean).join(" / ") + ')</span>' : '') + '</td>' +
       '<td class="' + (medRec ? "print-status-ok" : "") + '">' + (medRec ? "✓" : "☐") + '</td>' +
       '<td class="' + (vte ? "print-status-ok" : "") + '">' + (vte ? "✓" : "☐") + '</td>' +
       '<td class="' + (sup ? "print-status-ok" : "") + '">' + (sup ? "✓" : "☐") + '</td>' +
       '<td>' + crclCell + '</td>' +
-      '<td>' + a1cCell + '</td>' +
       '<td class="print-focus-cell">' + focusCell + '</td>' +
       '<td>' + todoCell + '</td>' +
     '</tr>';
@@ -1381,7 +1410,7 @@
 
     html += '<div class="print-section">';
     html += '<table class="print-table print-rounds-table"><thead><tr>' +
-      '<th>Room</th><th>Patient</th><th>Dx</th><th>Med Rec</th><th>VTE</th><th>SUP</th><th>CrCl</th><th>A1C</th><th>Monitoring</th><th>To Do</th>' +
+      '<th>Room</th><th>Patient</th><th>Dx</th><th>Med Rec</th><th>VTE</th><th>SUP</th><th>CrCl</th><th>Monitoring</th><th>To Do</th>' +
     '</tr></thead><tbody>';
     list.forEach(function(p){ html += buildRoundsPrintRow(p); });
     html += '</tbody></table></div>';
