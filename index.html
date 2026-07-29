@@ -315,12 +315,27 @@
       if(p.respFio2 === undefined) p.respFio2 = "";
       if(p.respPeep === undefined) p.respPeep = "";
       if(p.respSettings === undefined) p.respSettings = "";
+      // One-time swap: an earlier version assigned "Medication Route/Imaging" to GU and
+      // "Baseline Cr/Urine Output/Current Cr/Dialysis" to GI — the correct convention is the
+      // reverse. Move any data already saved under the swapped field names to the correct one.
+      var swapGuRoute = p.workupGuRoute, swapGuImaging = p.workupGuImaging;
+      var swapGiBaselineCr = p.workupGiBaselineCr, swapGiUrineOutput = p.workupGiUrineOutput,
+          swapGiCurrentCr = p.workupGiCurrentCr, swapGiDialysis = p.workupGiDialysis;
+      delete p.workupGuRoute; delete p.workupGuImaging;
+      delete p.workupGiBaselineCr; delete p.workupGiUrineOutput; delete p.workupGiCurrentCr; delete p.workupGiDialysis;
+      if(swapGuRoute !== undefined) p.workupGiRoute = swapGuRoute;
+      if(swapGuImaging !== undefined) p.workupGiImaging = swapGuImaging;
+      if(swapGiBaselineCr !== undefined) p.workupGuBaselineCr = swapGiBaselineCr;
+      if(swapGiUrineOutput !== undefined) p.workupGuUrineOutput = swapGiUrineOutput;
+      if(swapGiCurrentCr !== undefined) p.workupGuCurrentCr = swapGiCurrentCr;
+      if(swapGiDialysis !== undefined) p.workupGuDialysis = swapGiDialysis;
+
       ["workupPresenting", "workupPmh", "workupInfusionsOther",
         "workupNeuroSedation", "workupNeuroRass", "workupNeuroGcs", "workupNeuroLimb", "workupNeuroImaging",
         "workupCvRhythm", "workupCvRate", "workupCvBp", "workupCvLabs", "workupCvCath", "workupCvEcho", "workupCvHemo",
         "workupRespCxr", "workupRespChestTube",
-        "workupGuRoute", "workupGuImaging",
-        "workupGiBaselineCr", "workupGiUrineOutput", "workupGiCurrentCr", "workupGiDialysis",
+        "workupGiRoute", "workupGiImaging",
+        "workupGuBaselineCr", "workupGuUrineOutput", "workupGuCurrentCr", "workupGuDialysis",
         "workupIdWbc", "workupIdTemp", "workupGlycemicPocTrend",
         "workupHemeCurrent", "workupHemeBaseline",
         "workupHomeMeds"].forEach(function(f){ if(p[f] === undefined) p[f] = ""; });
@@ -330,8 +345,8 @@
       if(p.workupInfusions){ if(!p.workupInfusionsOther) p.workupInfusionsOther = p.workupInfusions; delete p.workupInfusions; }
       if(p.workupNeuro){ if(!p.workupNeuroSedation) p.workupNeuroSedation = p.workupNeuro; delete p.workupNeuro; }
       if(p.workupResp){ if(!p.workupRespCxr) p.workupRespCxr = p.workupResp; delete p.workupResp; }
-      if(p.workupGu){ if(!p.workupGuRoute) p.workupGuRoute = p.workupGu; delete p.workupGu; }
-      if(p.workupGi){ if(!p.workupGiBaselineCr) p.workupGiBaselineCr = p.workupGi; delete p.workupGi; }
+      if(p.workupGu){ if(!p.workupGiRoute) p.workupGiRoute = p.workupGu; delete p.workupGu; }
+      if(p.workupGi){ if(!p.workupGuBaselineCr) p.workupGuBaselineCr = p.workupGi; delete p.workupGi; }
       if(p.workupGlycemic){ if(!p.workupGlycemicPocTrend) p.workupGlycemicPocTrend = p.workupGlycemic; delete p.workupGlycemic; }
       if(p.workupHeme){ if(!p.workupHemeCurrent) p.workupHemeCurrent = p.workupHeme; delete p.workupHeme; }
       if(p.workupId){ if(!p.workupIdWbc) p.workupIdWbc = p.workupId; delete p.workupId; }
@@ -363,10 +378,13 @@
   var TDM_AGENTS = ["", "Vancomycin", "Gentamicin", "Digoxin", "Other"];
 
   // IV Critical Care Medications — checkable items with a dose-entry field (units shown as a hint,
-  // not a full protocol) for the currently running rate. These render under Infusions in the
-  // Initial Workup. The Renal/GU group (diuretics, bicarb) renders under Genitourinary instead —
-  // ALL_IV_MEDS_ITEMS below is the combined flat list used for prints and follow-ups either way.
+  // not a full protocol) for the currently running rate. All render together under Infusions in
+  // the Initial Workup, "Other" (diuretics, bicarb) listed first.
   var IV_MEDS_GROUPS = [
+    { label: "Other", items: [
+      { id: "ivm-furosemide", t: "Furosemide", unit: "mg/hr" },
+      { id: "ivm-bicarb", t: "Sodium Bicarbonate", unit: "mEq/hr" },
+    ]},
     { label: "Sedatives", items: [
       { id: "ivm-propofol", t: "Propofol", unit: "mcg/kg/min" },
       { id: "ivm-fentanyl", t: "Fentanyl", unit: "mcg/hr" },
@@ -384,22 +402,10 @@
       { id: "ivm-heparin", t: "Heparin", unit: "units/hr" },
     ]},
   ];
-  var GU_MEDS_ITEMS = [
-    { id: "ivm-furosemide", t: "Furosemide", unit: "mg/hr" },
-    { id: "ivm-bicarb", t: "Sodium Bicarbonate", unit: "mEq/hr" },
-  ];
-  var ALL_IV_MEDS_ITEMS = IV_MEDS_GROUPS.reduce(function(acc, g){ return acc.concat(g.items); }, []).concat(GU_MEDS_ITEMS);
+  var ALL_IV_MEDS_ITEMS = IV_MEDS_GROUPS.reduce(function(acc, g){ return acc.concat(g.items); }, []);
 
   var ABX_ITEMS = [
     { id: "abx-appropriate", t: "Spectrum / indication still appropriate", n: "De-escalate per culture results when available" },
-  ];
-  var INSULIN_ITEMS = [
-    { id: "ins-poc", t: "POC glucose trend reviewed" },
-    { id: "ins-regimen", t: "Sliding scale vs basal-bolus appropriate" },
-    { id: "ins-dka-gap", t: "DKA: anion gap / ketones trending to closure", n: "Continue insulin infusion until gap closed, not just until glucose normal" },
-    { id: "ins-dka-lytes", t: "Electrolytes monitored (K+, phosphate, Mg)", n: "Confirm K+ before starting insulin; recheck q1-2h during active correction" },
-    { id: "ins-dka-fluids", t: "Fluid resuscitation / rate appropriate" },
-    { id: "ins-transition", t: "Transition to SC insulin planned", n: "Overlap SC long-acting insulin 1-2h before stopping IV infusion" },
   ];
 
   function formatDateTime(dtStr){
@@ -430,15 +436,15 @@
     { label: "Limb Movement", field: "workupNeuroLimb" },
     { label: "Imaging", field: "workupNeuroImaging" },
   ];
-  var WORKUP_GU_FIELDS = [
-    { label: "Medication Route", field: "workupGuRoute" },
-    { label: "Imaging", field: "workupGuImaging" },
-  ];
   var WORKUP_GI_FIELDS = [
-    { label: "Baseline Cr", field: "workupGiBaselineCr" },
-    { label: "Urine Output", field: "workupGiUrineOutput" },
-    { label: "Current Cr", field: "workupGiCurrentCr" },
-    { label: "Dialysis Modality", field: "workupGiDialysis", placeholder: "if applicable" },
+    { label: "Medication Route", field: "workupGiRoute" },
+    { label: "Imaging", field: "workupGiImaging" },
+  ];
+  var WORKUP_GU_FIELDS = [
+    { label: "Baseline Cr", field: "workupGuBaselineCr" },
+    { label: "Urine Output", field: "workupGuUrineOutput" },
+    { label: "Current Cr", field: "workupGuCurrentCr" },
+    { label: "Dialysis Modality", field: "workupGuDialysis", placeholder: "if applicable" },
   ];
   var WORKUP_HEME_FIELDS = [
     { label: "Hgb Current", field: "workupHemeCurrent" },
@@ -494,8 +500,8 @@
       workupNeuroSedation: "", workupNeuroRass: "", workupNeuroGcs: "", workupNeuroLimb: "", workupNeuroImaging: "",
       workupCvRhythm: "", workupCvRate: "", workupCvBp: "", workupCvLabs: "", workupCvCath: "", workupCvEcho: "", workupCvHemo: "",
       workupRespCxr: "", workupRespChestTube: "",
-      workupGuRoute: "", workupGuImaging: "",
-      workupGiBaselineCr: "", workupGiUrineOutput: "", workupGiCurrentCr: "", workupGiDialysis: "",
+      workupGiRoute: "", workupGiImaging: "",
+      workupGuBaselineCr: "", workupGuUrineOutput: "", workupGuCurrentCr: "", workupGuDialysis: "",
       workupIdWbc: "", workupIdTemp: "", workupGlycemicPocTrend: "",
       workupHemeCurrent: "", workupHemeBaseline: "",
       workupHomeMeds: ""
@@ -720,11 +726,9 @@
       '</div>' +
       workupFieldsRowHtml(p, [{ label: "CXR Results", field: "workupRespCxr" }, { label: "Chest Tube", field: "workupRespChestTube" }]);
 
-    html += '<div class="workup-subtitle">Genitourinary</div>' +
-      workupFieldsRowHtml(p, WORKUP_GU_FIELDS) +
-      checklistItemsHtml(p, GU_MEDS_ITEMS, today, prev);
-
     html += '<div class="workup-subtitle">Gastrointestinal</div>' + workupFieldsRowHtml(p, WORKUP_GI_FIELDS);
+
+    html += '<div class="workup-subtitle">Genitourinary</div>' + workupFieldsRowHtml(p, WORKUP_GU_FIELDS);
 
     var idAppropriateItem = ABX_ITEMS[0];
     html += '<div class="workup-subtitle">Infection / ID</div>' +
@@ -748,8 +752,7 @@
       workupFieldsRowHtml(p, [{ label: "WBC", field: "workupIdWbc" }, { label: "Temp", field: "workupIdTemp" }]);
 
     html += '<div class="workup-subtitle">Glycemic</div>' +
-      checklistItemsHtml(p, INSULIN_ITEMS, today, prev) +
-      '<div class="rounds-head-row" style="margin-top:6px;">' +
+      '<div class="rounds-head-row">' +
         '<div class="rounds-field"><label>POC Trend</label><input type="text" value="' + escapeHtml(p.workupGlycemicPocTrend) + '" data-field="workupGlycemicPocTrend" data-pid="' + p.id + '" style="width:170px;"></div>' +
         '<div class="rounds-field"><label>A1C</label><input type="text" value="' + escapeHtml(p.a1cLevel) + '" data-field="a1cLevel" data-pid="' + p.id + '" style="width:65px;"></div>' +
         '<div class="rounds-field" style="flex:1; min-width:180px;"><label>Therapy</label><input type="text" value="' + escapeHtml(p.a1cChanges) + '" data-field="a1cChanges" data-pid="' + p.id + '" style="width:100%;"></div>' +
@@ -903,7 +906,6 @@
     var today = getTodayChecks(p);
     var candidates = ROUNDS_CORE_ITEMS.map(function(item){ return { item: item, area: "Core Review", checked: !!p.coreChecks[item.id], followUpWhenChecked: false }; });
     ABX_ITEMS.forEach(function(item){ candidates.push({ item: item, area: "Antibiotics", checked: !!today[item.id], followUpWhenChecked: false }); });
-    INSULIN_ITEMS.forEach(function(item){ candidates.push({ item: item, area: "Glycemic", checked: !!today[item.id], followUpWhenChecked: false }); });
     ALL_IV_MEDS_ITEMS.forEach(function(item){ candidates.push({ item: item, area: "IV Critical Care Medications", checked: !!today[item.id], followUpWhenChecked: true }); });
 
     var openSourceIds = p.tasks.filter(function(t){ return !t.done; }).map(function(t){ return t.sourceItem; });
@@ -1189,6 +1191,61 @@
     return active;
   }
 
+  // Pulls every entered Initial Workup field into a single "Monitoring" summary — used by both
+  // the Patient Summary PDF and the compact Daily Rounds table so nothing typed in Workup needs
+  // re-entering to show up in the daily print. Long narrative fields (Presenting Complaint, PMH,
+  // Cardiovascular, Home Meds) stay out of this quick summary and only appear in the full Workup Note.
+  function monitoringLines(p){
+    var lines = [];
+    if(p.tdmAgent || p.tdmTarget || p.tdmNextTrough){
+      var tdmBits = [];
+      if(p.tdmAgent) tdmBits.push("Agent " + p.tdmAgent);
+      if(p.tdmTarget) tdmBits.push("target " + p.tdmTarget);
+      if(p.tdmNextTrough) tdmBits.push("next trough " + formatDateTime(p.tdmNextTrough));
+      lines.push({ label: "TDM", value: tdmBits.length ? tdmBits.join(" · ") : "not yet specified" });
+    }
+    var abxBits = formattedAbxRows(p);
+    if(p.abxDuration) abxBits.push(p.abxDuration);
+    if(p.abxStopDate) abxBits.push("ASO " + formatDue(p.abxStopDate));
+    if(abxBits.length) lines.push({ label: "Abx", value: abxBits.join(" · ") });
+    if(p.cultures && p.cultures.length){
+      var cxBits = p.cultures.map(function(c){
+        var bits = [c.site || "Culture", c.status || "Pending"];
+        if(c.organism) bits.push(c.organism);
+        return bits.join(" ");
+      });
+      lines.push({ label: "Cultures", value: cxBits.join("; ") });
+    }
+    var idBits = [];
+    if(p.workupIdWbc) idBits.push("WBC " + p.workupIdWbc);
+    if(p.workupIdTemp) idBits.push("Temp " + p.workupIdTemp);
+    if(idBits.length) lines.push({ label: "ID", value: idBits.join(" · ") });
+    var ivMedsBits = activeIvMeds(p);
+    if(ivMedsBits.length) lines.push({ label: "IV Meds", value: ivMedsBits.join(", ") });
+    var respBits = [];
+    if(p.respMode) respBits.push(p.respMode);
+    if(p.respFio2) respBits.push("FiO2 " + p.respFio2 + "%");
+    if(p.respPeep) respBits.push("PEEP " + p.respPeep);
+    if(p.respSettings) respBits.push(p.respSettings);
+    if(p.workupRespCxr) respBits.push("CXR: " + p.workupRespCxr);
+    if(p.workupRespChestTube) respBits.push("Chest tube: " + p.workupRespChestTube);
+    if(respBits.length) lines.push({ label: "Resp", value: respBits.join(" · ") });
+    var neuroBits = WORKUP_NEURO_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(neuroBits.length) lines.push({ label: "Neuro", value: neuroBits.join(" · ") });
+    var giBits = WORKUP_GI_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(giBits.length) lines.push({ label: "GI", value: giBits.join(" · ") });
+    var guBits = WORKUP_GU_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(guBits.length) lines.push({ label: "GU", value: guBits.join(" · ") });
+    var glycemicBits = [];
+    if(p.workupGlycemicPocTrend) glycemicBits.push("POC " + p.workupGlycemicPocTrend);
+    if(p.a1cLevel) glycemicBits.push("A1C " + p.a1cLevel);
+    if(p.a1cChanges) glycemicBits.push("Therapy: " + p.a1cChanges);
+    if(glycemicBits.length) lines.push({ label: "Glycemic", value: glycemicBits.join(" · ") });
+    var hemeBits = WORKUP_HEME_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(hemeBits.length) lines.push({ label: "Heme", value: hemeBits.join(" · ") });
+    return lines;
+  }
+
   // Formats each antibiotic row as "Drug — dose" for print, skipping rows with nothing selected.
   function formattedAbxRows(p){
     return p.abxRows.map(function(r){
@@ -1234,44 +1291,14 @@
       }).filter(Boolean);
       if(ivpoBits.length) html += '<p class="print-dim" style="margin:2px 0 0 0;">IV→PO: ' + ivpoBits.join("; ") + '</p>';
     }
-    if(p.tdmAgent || p.tdmTarget || p.tdmNextTrough){
-      var tdmBits = [];
-      if(p.tdmAgent) tdmBits.push("Agent: " + escapeHtml(p.tdmAgent));
-      if(p.tdmTarget) tdmBits.push("Target: " + escapeHtml(p.tdmTarget));
-      if(p.tdmNextTrough) tdmBits.push("Next trough due: " + formatDateTime(p.tdmNextTrough));
-      html += '<p class="print-dim" style="margin:2px 0 0 0;">TDM/Levels — ' + (tdmBits.length ? tdmBits.join(" · ") : "not yet specified") + '</p>';
-    }
-    if(p.a1cChanges){
-      html += '<p class="print-dim" style="margin:2px 0 0 0;">Therapy: ' + escapeHtml(p.a1cChanges) + '</p>';
-    }
-    if(p.abxRows.length){
-      var abxRowBits = formattedAbxRows(p);
-      if(abxRowBits.length) html += '<p class="print-dim" style="margin:2px 0 0 0;">Antibiotics: ' + abxRowBits.map(escapeHtml).join("; ") + '</p>';
-    }
-    if(p.abxStopDate || p.abxDuration){
-      var abxBits = [];
-      if(p.abxDuration) abxBits.push("Duration: " + escapeHtml(p.abxDuration));
-      if(p.abxStopDate) abxBits.push("ASO/Stop date: " + formatDue(p.abxStopDate));
-      html += '<p class="print-dim" style="margin:2px 0 0 0;">' + abxBits.join(" · ") + '</p>';
-    }
-    if(p.cultures && p.cultures.length){
-      html += '<div style="margin-top:4px;"><span class="print-dim">Cultures:</span><ul class="print-list">';
-      p.cultures.forEach(function(c){
-        var bits = [];
-        if(c.site) bits.push(c.site);
-        bits.push(c.status || "Pending");
-        if(c.organism) bits.push(c.organism);
-        if(c.sens) bits.push("Sens: " + c.sens);
-        html += '<li>' + escapeHtml(bits.join(" · ")) + '</li>';
-      });
-      html += '</ul></div>';
-    }
-    var ivMedsBits = activeIvMeds(p);
-    if(ivMedsBits.length) html += '<p class="print-dim" style="margin:2px 0 0 0;">IV Critical Care Meds: ' + ivMedsBits.map(escapeHtml).join("; ") + '</p>';
-    if(p.respMode || p.respSettings){
-      html += '<p class="print-dim" style="margin:2px 0 0 0;">Respiratory: ' + [p.respMode, p.respSettings].filter(Boolean).map(escapeHtml).join(" · ") + '</p>';
-    }
     html += '</div>';
+
+    var monLines = monitoringLines(p);
+    if(monLines.length){
+      html += '<div class="print-section"><h2>Monitoring</h2>' +
+        monLines.map(function(l){ return '<p class="print-dim" style="margin:2px 0;">' + escapeHtml(l.label) + ': ' + escapeHtml(l.value) + '</p>'; }).join("") +
+      '</div>';
+    }
 
     html += '<div class="print-section"><h2>Open Follow-Up Tasks (' + openTasks.length + ')</h2>';
     if(openTasks.length){
@@ -1382,11 +1409,9 @@
     if(p.workupRespChestTube) respLines.push("Chest Tube: " + p.workupRespChestTube);
     html += bulletSection("Respiratory", respLines);
 
-    var guLines = WORKUP_GU_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
-    guLines = guLines.concat(checkedItemLines(GU_MEDS_ITEMS));
-    html += bulletSection("Genitourinary", guLines);
-
     html += bulletSection("Gastrointestinal", WORKUP_GI_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; }));
+
+    html += bulletSection("Genitourinary", WORKUP_GU_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; }));
 
     var idLines = formattedAbxRows(p);
     if(p.abxDuration) idLines.push("Duration: " + p.abxDuration);
@@ -1410,7 +1435,7 @@
     if(p.workupIdTemp) idLines.push("Temp: " + p.workupIdTemp);
     html += bulletSection("Infection / ID", idLines);
 
-    var glycemicLines = checkedItemLines(INSULIN_ITEMS);
+    var glycemicLines = [];
     if(p.workupGlycemicPocTrend) glycemicLines.push("POC Trend: " + p.workupGlycemicPocTrend);
     if(p.a1cLevel) glycemicLines.push("A1C: " + p.a1cLevel);
     if(p.a1cChanges) glycemicLines.push("Therapy: " + p.a1cChanges);
@@ -1514,36 +1539,7 @@
     var vte = !!p.coreChecks.vte;
     var sup = !!p.coreChecks.stressulcer;
     var crclCell = p.crcl ? escapeHtml(p.crcl) : "—";
-    var focusParts = [];
-    if(p.tdmAgent || p.tdmTarget || p.tdmNextTrough){
-      var tdmBits = [];
-      if(p.tdmAgent) tdmBits.push(escapeHtml(p.tdmAgent));
-      if(p.tdmTarget) tdmBits.push("target " + escapeHtml(p.tdmTarget));
-      if(p.tdmNextTrough) tdmBits.push("next trough " + formatDateTime(p.tdmNextTrough));
-      focusParts.push("<div><strong>TDM:</strong> " + (tdmBits.length ? tdmBits.join(" · ") : '<span class="print-dim">not yet specified</span>') + "</div>");
-    }
-    if(p.a1cChanges){
-      focusParts.push("<div><strong>Glycemic therapy:</strong> " + escapeHtml(p.a1cChanges) + "</div>");
-    }
-    if(p.abxRows.length || p.abxStopDate || p.abxDuration){
-      var abxBits = formattedAbxRows(p).map(escapeHtml);
-      if(p.abxDuration) abxBits.push(escapeHtml(p.abxDuration));
-      if(p.abxStopDate) abxBits.push("ASO " + formatDue(p.abxStopDate));
-      if(abxBits.length) focusParts.push("<div><strong>Abx:</strong> " + abxBits.join(" · ") + "</div>");
-    }
-    if(p.cultures && p.cultures.length){
-      var cxBits = p.cultures.map(function(c){
-        var bits = [c.site || "Culture", c.status || "Pending"];
-        if(c.organism) bits.push(c.organism);
-        return bits.join(" ");
-      });
-      focusParts.push("<div><strong>Cultures:</strong> " + cxBits.map(escapeHtml).join("; ") + "</div>");
-    }
-    var ivMedsBits = activeIvMeds(p);
-    if(ivMedsBits.length) focusParts.push("<div><strong>IV Meds:</strong> " + ivMedsBits.map(escapeHtml).join(", ") + "</div>");
-    if(p.respMode){
-      focusParts.push("<div><strong>Resp:</strong> " + escapeHtml(p.respMode) + "</div>");
-    }
+    var focusParts = monitoringLines(p).map(function(l){ return "<div><strong>" + escapeHtml(l.label) + ":</strong> " + escapeHtml(l.value) + "</div>"; });
     var focusCell = focusParts.join("");
     if(!focusCell) focusCell = '<span class="print-dim">—</span>';
     var openTasks = p.tasks.filter(function(t){ return !t.done; });
