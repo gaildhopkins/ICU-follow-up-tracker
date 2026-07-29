@@ -441,6 +441,7 @@
     { label: "Imaging", field: "workupGiImaging" },
   ];
   var WORKUP_GU_FIELDS = [
+    { label: "CrCl", field: "crcl" },
     { label: "Baseline Cr", field: "workupGuBaselineCr" },
     { label: "Urine Output", field: "workupGuUrineOutput" },
     { label: "Current Cr", field: "workupGuCurrentCr" },
@@ -989,8 +990,6 @@
           '<span class="patient-name">' + escapeHtml(p.name) + '</span>' +
           (p.room ? '<span class="patient-meta"> Room ' + escapeHtml(p.room) + '</span>' : '') +
           (p.dx ? '<span class="patient-meta"> · ' + escapeHtml(p.dx) + '</span>' : '') +
-          (p.respFio2 ? '<span class="patient-meta"> · FiO2 ' + escapeHtml(p.respFio2) + '%</span>' : '') +
-          (p.respPeep ? '<span class="patient-meta"> · PEEP ' + escapeHtml(p.respPeep) + '</span>' : '') +
         '</div>' +
         '<div class="patient-badges">' +
           '<span class="badge ' + rBadge.cls + '">' + rBadge.label + '</span>' +
@@ -1001,9 +1000,6 @@
         '<div class="rounds-head-row">' +
           '<div class="rounds-field"><label>Room</label><input type="text" value="' + escapeHtml(p.room) + '" data-field="room" data-pid="' + p.id + '" style="width:80px;"></div>' +
           '<div class="rounds-field"><label>Diagnosis</label><input type="text" value="' + escapeHtml(p.dx) + '" data-field="dx" data-pid="' + p.id + '" style="width:200px;"></div>' +
-          '<div class="rounds-field"><label>FiO2 %</label><input type="number" value="' + escapeHtml(p.respFio2) + '" data-field="respFio2" data-pid="' + p.id + '" style="width:70px;"></div>' +
-          '<div class="rounds-field"><label>PEEP</label><input type="number" value="' + escapeHtml(p.respPeep) + '" data-field="respPeep" data-pid="' + p.id + '" style="width:65px;"></div>' +
-          '<div class="rounds-field"><label>CrCl</label><input type="text" value="' + escapeHtml(p.crcl) + '" data-field="crcl" data-pid="' + p.id + '" style="width:65px;"></div>' +
           '<div class="rounds-field"><label>A1C</label><input type="text" value="' + escapeHtml(p.a1cLevel) + '" data-field="a1cLevel" data-pid="' + p.id + '" style="width:65px;"></div>' +
         '</div>' +
         buildWorkupSectionHtml(p) +
@@ -1195,15 +1191,35 @@
   // the Patient Summary PDF and the compact Daily Rounds table so nothing typed in Workup needs
   // re-entering to show up in the daily print. Long narrative fields (Presenting Complaint, PMH,
   // Cardiovascular, Home Meds) stay out of this quick summary and only appear in the full Workup Note.
+  // Same head-to-toe order as the Initial Workup form: Infusions, Neuro, CV, Resp, GI, GU,
+  // ID (Abx, Cultures, TDM, WBC/Temp — matching the ID section's internal order), Glycemic, Heme.
   function monitoringLines(p){
     var lines = [];
-    if(p.tdmAgent || p.tdmTarget || p.tdmNextTrough){
-      var tdmBits = [];
-      if(p.tdmAgent) tdmBits.push("Agent " + p.tdmAgent);
-      if(p.tdmTarget) tdmBits.push("target " + p.tdmTarget);
-      if(p.tdmNextTrough) tdmBits.push("next trough " + formatDateTime(p.tdmNextTrough));
-      lines.push({ label: "TDM", value: tdmBits.length ? tdmBits.join(" · ") : "not yet specified" });
-    }
+
+    var ivMedsBits = activeIvMeds(p);
+    if(ivMedsBits.length) lines.push({ label: "Infusions", value: ivMedsBits.join(", ") });
+
+    var neuroBits = WORKUP_NEURO_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(neuroBits.length) lines.push({ label: "Neuro", value: neuroBits.join(" · ") });
+
+    var cvBits = WORKUP_CV_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(cvBits.length) lines.push({ label: "CV", value: cvBits.join(" · ") });
+
+    var respBits = [];
+    if(p.respMode) respBits.push(p.respMode);
+    if(p.respFio2) respBits.push("FiO2 " + p.respFio2 + "%");
+    if(p.respPeep) respBits.push("PEEP " + p.respPeep);
+    if(p.respSettings) respBits.push(p.respSettings);
+    if(p.workupRespCxr) respBits.push("CXR: " + p.workupRespCxr);
+    if(p.workupRespChestTube) respBits.push("Chest tube: " + p.workupRespChestTube);
+    if(respBits.length) lines.push({ label: "Resp", value: respBits.join(" · ") });
+
+    var giBits = WORKUP_GI_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(giBits.length) lines.push({ label: "GI", value: giBits.join(" · ") });
+
+    var guBits = WORKUP_GU_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
+    if(guBits.length) lines.push({ label: "GU", value: guBits.join(" · ") });
+
     var abxBits = formattedAbxRows(p);
     if(p.abxDuration) abxBits.push(p.abxDuration);
     if(p.abxStopDate) abxBits.push("ASO " + formatDue(p.abxStopDate));
@@ -1216,33 +1232,27 @@
       });
       lines.push({ label: "Cultures", value: cxBits.join("; ") });
     }
+    if(p.tdmAgent || p.tdmTarget || p.tdmNextTrough){
+      var tdmBits = [];
+      if(p.tdmAgent) tdmBits.push("Agent " + p.tdmAgent);
+      if(p.tdmTarget) tdmBits.push("target " + p.tdmTarget);
+      if(p.tdmNextTrough) tdmBits.push("next trough " + formatDateTime(p.tdmNextTrough));
+      lines.push({ label: "TDM", value: tdmBits.length ? tdmBits.join(" · ") : "not yet specified" });
+    }
     var idBits = [];
     if(p.workupIdWbc) idBits.push("WBC " + p.workupIdWbc);
     if(p.workupIdTemp) idBits.push("Temp " + p.workupIdTemp);
     if(idBits.length) lines.push({ label: "ID", value: idBits.join(" · ") });
-    var ivMedsBits = activeIvMeds(p);
-    if(ivMedsBits.length) lines.push({ label: "IV Meds", value: ivMedsBits.join(", ") });
-    var respBits = [];
-    if(p.respMode) respBits.push(p.respMode);
-    if(p.respFio2) respBits.push("FiO2 " + p.respFio2 + "%");
-    if(p.respPeep) respBits.push("PEEP " + p.respPeep);
-    if(p.respSettings) respBits.push(p.respSettings);
-    if(p.workupRespCxr) respBits.push("CXR: " + p.workupRespCxr);
-    if(p.workupRespChestTube) respBits.push("Chest tube: " + p.workupRespChestTube);
-    if(respBits.length) lines.push({ label: "Resp", value: respBits.join(" · ") });
-    var neuroBits = WORKUP_NEURO_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
-    if(neuroBits.length) lines.push({ label: "Neuro", value: neuroBits.join(" · ") });
-    var giBits = WORKUP_GI_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
-    if(giBits.length) lines.push({ label: "GI", value: giBits.join(" · ") });
-    var guBits = WORKUP_GU_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
-    if(guBits.length) lines.push({ label: "GU", value: guBits.join(" · ") });
+
     var glycemicBits = [];
     if(p.workupGlycemicPocTrend) glycemicBits.push("POC " + p.workupGlycemicPocTrend);
     if(p.a1cLevel) glycemicBits.push("A1C " + p.a1cLevel);
     if(p.a1cChanges) glycemicBits.push("Therapy: " + p.a1cChanges);
     if(glycemicBits.length) lines.push({ label: "Glycemic", value: glycemicBits.join(" · ") });
+
     var hemeBits = WORKUP_HEME_FIELDS.filter(function(f){ return p[f.field]; }).map(function(f){ return f.label + ": " + p[f.field]; });
     if(hemeBits.length) lines.push({ label: "Heme", value: hemeBits.join(" · ") });
+
     return lines;
   }
 
@@ -1266,8 +1276,6 @@
     var metaBits = [];
     if(p.room) metaBits.push("Room " + p.room);
     if(p.dx) metaBits.push(p.dx);
-    if(p.respFio2) metaBits.push("FiO2 " + p.respFio2 + "%");
-    if(p.respPeep) metaBits.push("PEEP " + p.respPeep);
     if(metaBits.length) html += '<div class="print-patient-room">' + escapeHtml(metaBits.join(" · ")) + '</div>';
     html += '</div>';
 
@@ -1280,9 +1288,6 @@
         (note ? ' <span class="print-dim">— ' + escapeHtml(note) + '</span>' : '') + '</li>';
     });
     html += '</ul>';
-    var vitalsBits = [];
-    if(p.crcl) vitalsBits.push("CrCl " + escapeHtml(p.crcl));
-    if(vitalsBits.length) html += '<p class="print-dim" style="margin:6px 0 0 0;">' + vitalsBits.join(" · ") + '</p>';
     if(p.ivpoRows && p.ivpoRows.length){
       var ivpoBits = p.ivpoRows.map(function(r){
         var label = r.drugClass === "Other" ? (r.otherText || "Other") : r.drugClass;
@@ -1364,8 +1369,6 @@
     var metaBits = [];
     if(p.room) metaBits.push("Room " + p.room);
     if(p.dx) metaBits.push(p.dx);
-    if(p.respFio2) metaBits.push("FiO2 " + p.respFio2 + "%");
-    if(p.respPeep) metaBits.push("PEEP " + p.respPeep);
     if(metaBits.length) html += '<div class="print-patient-room">' + escapeHtml(metaBits.join(" · ")) + '</div>';
     html += '</div>';
 
@@ -1550,7 +1553,7 @@
     return '<tr>' +
       '<td>' + escapeHtml(p.room || "—") + '</td>' +
       '<td>' + escapeHtml(p.name) + '</td>' +
-      '<td>' + escapeHtml(p.dx || "—") + ((p.respFio2 || p.respPeep) ? ' <span class="print-dim">(' + [p.respFio2 ? "FiO2 " + escapeHtml(p.respFio2) + "%" : null, p.respPeep ? "PEEP " + escapeHtml(p.respPeep) : null].filter(Boolean).join(" / ") + ')</span>' : '') + '</td>' +
+      '<td>' + escapeHtml(p.dx || "—") + '</td>' +
       '<td class="' + (medRec ? "print-status-ok" : "") + '">' + (medRec ? "✓" : "☐") + '</td>' +
       '<td class="' + (vte ? "print-status-ok" : "") + '">' + (vte ? "✓" : "☐") + '</td>' +
       '<td class="' + (sup ? "print-status-ok" : "") + '">' + (sup ? "✓" : "☐") + '</td>' +
