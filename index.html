@@ -1673,6 +1673,11 @@
     var vte = !!p.coreChecks.vte;
     var sup = !!p.coreChecks.stressulcer;
     var crclCell = p.crcl ? escapeHtml(p.crcl) : "—";
+    var dxCell = escapeHtml(p.dx || "—");
+    var dxExtra = [];
+    if(p.workupPresenting) dxExtra.push("Presenting: " + escapeHtml(p.workupPresenting));
+    if(p.workupPmh) dxExtra.push("PMH: " + escapeHtml(p.workupPmh));
+    if(dxExtra.length) dxCell += '<div class="print-dim" style="margin-top:2px;">' + dxExtra.join('<br>') + '</div>';
     var focusParts = monitoringLines(p).map(function(l){ return "<div><strong>" + escapeHtml(l.label) + ":</strong> " + escapeHtml(l.value) + "</div>"; });
     var focusCell = focusParts.join("");
     if(!focusCell) focusCell = '<span class="print-dim">—</span>';
@@ -1684,7 +1689,7 @@
     return '<tr>' +
       '<td>' + escapeHtml(p.room || "—") + '</td>' +
       '<td>' + escapeHtml(p.name) + '</td>' +
-      '<td>' + escapeHtml(p.dx || "—") + '</td>' +
+      '<td>' + dxCell + '</td>' +
       '<td class="' + (medRec ? "print-status-ok" : "") + '">' + (medRec ? "✓" : "☐") + '</td>' +
       '<td class="' + (vte ? "print-status-ok" : "") + '">' + (vte ? "✓" : "☐") + '</td>' +
       '<td class="' + (sup ? "print-status-ok" : "") + '">' + (sup ? "✓" : "☐") + '</td>' +
