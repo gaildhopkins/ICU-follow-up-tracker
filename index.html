@@ -213,6 +213,7 @@
   .print-rounds-table{font-size:10.5px;}
   .print-rounds-table th, .print-rounds-table td{padding:4px 6px;}
   .print-focus-cell div{margin-bottom:2px;}
+  .print-status-stack{margin-top:3px; display:flex; flex-direction:column; gap:1px; font-size:10.5px; color:#555;}
 </style>
 </head>
 <body>
@@ -1689,13 +1690,16 @@
       ? openTasks.map(function(t){ return escapeHtml(t.text) + (t.due ? ' <span class="print-dim">(' + formatDue(t.due) + ')</span>' : ''); }).join('<br>')
       : '<span class="print-dim">—</span>';
 
+    var statusCell = '<div class="print-status-stack">' +
+      '<span class="' + (medRec ? "print-status-ok" : "") + '">' + (medRec ? "✓" : "☐") + ' Med Rec</span>' +
+      '<span class="' + (vte ? "print-status-ok" : "") + '">' + (vte ? "✓" : "☐") + ' VTE</span>' +
+      '<span class="' + (sup ? "print-status-ok" : "") + '">' + (sup ? "✓" : "☐") + ' SUP</span>' +
+      '<span>CrCl ' + crclCell + '</span>' +
+    '</div>';
+
     return '<tr>' +
-      '<td>' + escapeHtml(p.name) + '<div class="print-dim" style="margin-top:2px;">Room ' + escapeHtml(p.room || "—") + '</div></td>' +
+      '<td>' + escapeHtml(p.name) + '<div class="print-dim" style="margin-top:2px;">Room ' + escapeHtml(p.room || "—") + '</div>' + statusCell + '</td>' +
       '<td style="max-width:260px; word-wrap:break-word;">' + dxCell + '</td>' +
-      '<td class="' + (medRec ? "print-status-ok" : "") + '">' + (medRec ? "✓" : "☐") + '</td>' +
-      '<td class="' + (vte ? "print-status-ok" : "") + '">' + (vte ? "✓" : "☐") + '</td>' +
-      '<td class="' + (sup ? "print-status-ok" : "") + '">' + (sup ? "✓" : "☐") + '</td>' +
-      '<td>' + crclCell + '</td>' +
       '<td class="print-focus-cell">' + focusCell + '</td>' +
       '<td>' + todoCell + '</td>' +
     '</tr>';
@@ -1715,7 +1719,7 @@
 
     html += '<div class="print-section">';
     html += '<table class="print-table print-rounds-table"><thead><tr>' +
-      '<th>Patient</th><th style="width:260px;">Dx</th><th>Med Rec</th><th>VTE</th><th>SUP</th><th>CrCl</th><th>Monitoring</th><th>To Do</th>' +
+      '<th>Patient</th><th style="width:260px;">Dx</th><th>Monitoring</th><th>To Do</th>' +
     '</tr></thead><tbody>';
     list.forEach(function(p){ html += buildRoundsPrintRow(p); });
     html += '</tbody></table></div>';
