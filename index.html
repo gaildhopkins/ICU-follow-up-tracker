@@ -1516,11 +1516,11 @@
       if(!text) return "";
       return '<div class="print-section"><h2>' + escapeHtml(title) + '</h2><p style="white-space:pre-wrap; margin:0;">' + escapeHtml(text) + '</p></div>';
     }
+    // One compact line per section (fields joined by " · "), matching the Monitoring row style
+    // used in the Daily Rounds report, rather than a separate line for every single field.
     function bulletSection(title, lines){
       if(!lines.length) return "";
-      return '<div class="print-section"><h2>' + escapeHtml(title) + '</h2><ul class="print-list">' +
-        lines.map(function(l){ return '<li>' + escapeHtml(l) + '</li>'; }).join("") +
-      '</ul></div>';
+      return '<div class="print-section"><h2>' + escapeHtml(title) + '</h2><p style="margin:0;">' + escapeHtml(lines.join(" · ")) + '</p></div>';
     }
     function checkedItemLines(items){
       return items.filter(function(item){ return !!today[item.id]; }).map(function(item){
@@ -1639,10 +1639,11 @@
       out.push(text);
       out.push("");
     }
+    // One compact line per section (fields joined by " · "), matching the Monitoring row style
+    // used in the Daily Rounds report, rather than a separate line for every single field.
     function bulletSection(title, lines){
       if(!lines.length) return;
-      out.push(title.toUpperCase());
-      lines.forEach(function(l){ out.push("- " + l); });
+      out.push(title.toUpperCase() + ": " + lines.join(" · "));
       out.push("");
     }
     function checkedItemLines(items){
