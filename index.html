@@ -365,7 +365,7 @@
         "workupGuBaselineCr", "workupGuUrineOutput", "workupGuCurrentCr",
         "workupGuHd", "workupGuHdSchedule", "workupGuPd", "workupGuFoleyDate",
         "workupIdWbc", "workupIdTemp", "workupIdCrp", "workupIdProcalcitonin", "workupIdImaging", "workupGlycemicPocTrend",
-        "workupHemeCurrent", "workupHemeBaseline",
+        "workupHemeCurrent", "workupHemeBaseline", "workupHemeIron", "workupHemePlt", "workupHemeTreatment",
         "workupHomeMeds"].forEach(function(f){ if(p[f] === undefined) p[f] = ""; });
 
       // Migrate legacy single free-text workup fields (from before the head-to-toe consolidation)
@@ -513,8 +513,11 @@
     { label: "Imaging", field: "workupGuImaging" },
   ];
   var WORKUP_HEME_FIELDS = [
-    { label: "Hgb Current", field: "workupHemeCurrent" },
-    { label: "Hgb Baseline", field: "workupHemeBaseline" },
+    { label: "Current Hgb", field: "workupHemeCurrent" },
+    { label: "Baseline", field: "workupHemeBaseline" },
+    { label: "Iron Studies", field: "workupHemeIron" },
+    { label: "Platelets", field: "workupHemePlt" },
+    { label: "Treatment", field: "workupHemeTreatment" },
   ];
   var openWorkupSections = {};
 
@@ -572,7 +575,7 @@
       workupGuBaselineCr: "", workupGuUrineOutput: "", workupGuCurrentCr: "",
       workupGuHd: "", workupGuHdSchedule: "", workupGuPd: "", workupGuFoleyDate: "",
       workupIdOnAbx: "", workupIdWbc: "", workupIdTemp: "", workupIdCrp: "", workupIdProcalcitonin: "", workupIdImaging: "", workupGlycemicPocTrend: "",
-      workupHemeCurrent: "", workupHemeBaseline: "",
+      workupHemeCurrent: "", workupHemeBaseline: "", workupHemeIron: "", workupHemePlt: "", workupHemeTreatment: "",
       workupHomeMeds: ""
     };
     state.patients.unshift(p);
@@ -1687,9 +1690,8 @@
       : '<span class="print-dim">—</span>';
 
     return '<tr>' +
-      '<td>' + escapeHtml(p.room || "—") + '</td>' +
-      '<td>' + escapeHtml(p.name) + '</td>' +
-      '<td>' + dxCell + '</td>' +
+      '<td>' + escapeHtml(p.name) + '<div class="print-dim" style="margin-top:2px;">Room ' + escapeHtml(p.room || "—") + '</div></td>' +
+      '<td style="max-width:130px; word-wrap:break-word;">' + dxCell + '</td>' +
       '<td class="' + (medRec ? "print-status-ok" : "") + '">' + (medRec ? "✓" : "☐") + '</td>' +
       '<td class="' + (vte ? "print-status-ok" : "") + '">' + (vte ? "✓" : "☐") + '</td>' +
       '<td class="' + (sup ? "print-status-ok" : "") + '">' + (sup ? "✓" : "☐") + '</td>' +
@@ -1713,7 +1715,7 @@
 
     html += '<div class="print-section">';
     html += '<table class="print-table print-rounds-table"><thead><tr>' +
-      '<th>Room</th><th>Patient</th><th>Dx</th><th>Med Rec</th><th>VTE</th><th>SUP</th><th>CrCl</th><th>Monitoring</th><th>To Do</th>' +
+      '<th>Patient</th><th style="width:130px;">Dx</th><th>Med Rec</th><th>VTE</th><th>SUP</th><th>CrCl</th><th>Monitoring</th><th>To Do</th>' +
     '</tr></thead><tbody>';
     list.forEach(function(p){ html += buildRoundsPrintRow(p); });
     html += '</tbody></table></div>';
