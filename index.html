@@ -133,6 +133,7 @@
   .rounds-field input, .rounds-field select{font-size:13px; padding:7px 9px;}
   .rounds-section{margin-top:12px; border-top:1px solid var(--border-soft); padding-top:10px;}
   .rounds-section-title{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-dim); margin-bottom:4px;}
+  .rounds-2col{display:grid; grid-template-columns:1fr 1fr; column-gap:14px;}
   .rounds-item{display:flex; align-items:flex-start; gap:9px; padding:5px 0; flex-wrap:wrap;}
   .rounds-item input[type=checkbox]{width:16px; height:16px; margin-top:2px; accent-color:var(--teal); cursor:pointer; flex-shrink:0;}
   .rounds-item label{font-size:13px; line-height:1.4; cursor:pointer; flex:1; min-width:140px;}
@@ -164,6 +165,7 @@
   @media (max-width:600px){
     .brand h1{font-size:14px;}
     .task-due{white-space:normal;}
+    .rounds-2col{grid-template-columns:1fr;}
   }
 
   /* ---------- Print / PDF export ---------- */
@@ -315,6 +317,17 @@
       if(p.respFio2 === undefined) p.respFio2 = "";
       if(p.respPeep === undefined) p.respPeep = "";
       if(p.respSettings === undefined) p.respSettings = "";
+      // Default the "on IV infusions" toggle to on if this patient already has any IV Critical
+      // Care Medication checked or noted from before the toggle existed, so nothing already
+      // entered gets silently hidden.
+      if(p.infusionsActive === undefined){
+        var ivMedIds = ["ivm-furosemide", "ivm-bicarb", "ivm-propofol", "ivm-fentanyl", "ivm-dex",
+          "ivm-norepi", "ivm-vaso", "ivm-amio", "ivm-milrinone", "ivm-dobut", "ivm-ntg", "ivm-heparin"];
+        p.infusionsActive = ivMedIds.some(function(id){
+          if(p.itemNotes[id]) return true;
+          return Object.keys(p.checksByDate).some(function(d){ return p.checksByDate[d] && p.checksByDate[d][id]; });
+        });
+      }
       // One-time swap: an earlier version assigned "Medication Route/Imaging" to GU and
       // "Baseline Cr/Urine Output/Current Cr/Dialysis" to GI — the correct convention is the
       // reverse. Move any data already saved under the swapped field names to the correct one.
@@ -383,7 +396,7 @@
   var IV_MEDS_GROUPS = [
     { label: "Other", items: [
       { id: "ivm-furosemide", t: "Furosemide", unit: "mg/hr" },
-      { id: "ivm-bicarb", t: "Sodium Bicarbonate", unit: "mEq/hr" },
+      { id: "ivm-bicarb", t: "Sodium Bicarbonate", unit: "mL/hr" },
     ]},
     { label: "Sedatives", items: [
       { id: "ivm-propofol", t: "Propofol", unit: "mcg/kg/min" },
@@ -497,6 +510,7 @@
       tdmAgent: "", tdmNextTrough: "", tdmTarget: "", tdmFrequency: "", a1cLevel: "", a1cChanges: "",
       itemNotes: {}, checksByDate: {},
       ivpoRows: [], abxRows: [], abxStopDate: "", abxDuration: "", cultures: [], respMode: "", respFio2: "", respPeep: "", respSettings: "",
+      infusionsActive: false,
       workupPresenting: "", workupPmh: "", workupInfusionsOther: "",
       workupNeuroSedation: "", workupNeuroRass: "", workupNeuroGcs: "", workupNeuroLimb: "", workupNeuroImaging: "",
       workupCvRhythm: "", workupCvRate: "", workupCvBp: "", workupCvLabs: "", workupCvCath: "", workupCvEcho: "", workupCvHemo: "",
@@ -584,6 +598,16 @@
     if(!p) return;
     p.coreChecks[itemId] = !p.coreChecks[itemId];
     saveState();
+    renderPatients();
+  }
+  // Purely a visibility toggle — hides the IV Meds checklist for patients with no drips running,
+  // without clearing anything already checked underneath.
+  function toggleInfusionsActive(pid){
+    var p = state.patients.find(function(p){ return p.id === pid; });
+    if(!p) return;
+    p.infusionsActive = !p.infusionsActive;
+    saveState();
+    openPatients[pid] = true;
     renderPatients();
   }
   function updateItemNote(pid, itemId, value){
@@ -704,13 +728,19 @@
     html += workupTextareaHtml(p, "Past Medical History", "workupPmh");
 
     html += '<div class="workup-subtitle">Infusions</div>' +
-      IV_MEDS_GROUPS.map(function(g){
+      '<div class="rounds-item">' +
+        '<input type="checkbox" id="infusions-active-' + p.id + '" data-infusions-toggle="' + p.id + '" ' + (p.infusionsActive ? "checked" : "") + '>' +
+        '<label for="infusions-active-' + p.id + '">Patient on IV infusions</label>' +
+      '</div>';
+    if(p.infusionsActive){
+      html += IV_MEDS_GROUPS.map(function(g){
         return '<div class="workup-subtitle" style="margin-top:6px; text-transform:none; font-weight:600; color:var(--text);">' + escapeHtml(g.label) + '</div>' +
-          checklistItemsHtml(p, g.items, today, prev);
+          '<div class="rounds-2col">' + checklistItemsHtml(p, g.items, today, prev) + '</div>';
       }).join("") +
       '<div class="rounds-head-row" style="margin-top:6px;">' +
         '<div class="rounds-field" style="flex:1;"><label>Other Infusions</label><input type="text" value="' + escapeHtml(p.workupInfusionsOther) + '" data-field="workupInfusionsOther" data-pid="' + p.id + '" placeholder="anything not listed above" style="width:100%;"></div>' +
       '</div>';
+    }
 
     html += '<div class="workup-subtitle">Neurological</div>' + workupFieldsRowHtml(p, WORKUP_NEURO_FIELDS);
 
@@ -1053,12 +1083,19 @@
     wrap.querySelectorAll("[data-workup-note]").forEach(function(btn){
       btn.addEventListener("click", function(e){ e.stopPropagation(); exportWorkupNote(btn.dataset.workupNote); });
     });
-    wrap.querySelectorAll(".rounds-item input[type=checkbox]").forEach(function(cb){
+    wrap.querySelectorAll(".rounds-item input[type=checkbox]:not([data-infusions-toggle])").forEach(function(cb){
       cb.addEventListener("click", function(e){ e.stopPropagation(); });
       cb.addEventListener("change", function(){
         openPatients[cb.dataset.pid] = true;
         if(CORE_ITEM_IDS.indexOf(cb.dataset.item) !== -1) toggleCoreCheck(cb.dataset.pid, cb.dataset.item);
         else toggleRoundsCheck(cb.dataset.pid, cb.dataset.item);
+      });
+    });
+    wrap.querySelectorAll("[data-infusions-toggle]").forEach(function(cb){
+      cb.addEventListener("click", function(e){ e.stopPropagation(); });
+      cb.addEventListener("change", function(){
+        openPatients[cb.dataset.infusionsToggle] = true;
+        toggleInfusionsActive(cb.dataset.infusionsToggle);
       });
     });
     wrap.querySelectorAll(".prev-hint").forEach(function(span){
