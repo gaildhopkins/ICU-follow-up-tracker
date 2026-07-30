@@ -1691,7 +1691,7 @@
 
     return '<tr>' +
       '<td>' + escapeHtml(p.name) + '<div class="print-dim" style="margin-top:2px;">Room ' + escapeHtml(p.room || "—") + '</div></td>' +
-      '<td style="max-width:130px; word-wrap:break-word;">' + dxCell + '</td>' +
+      '<td style="max-width:260px; word-wrap:break-word;">' + dxCell + '</td>' +
       '<td class="' + (medRec ? "print-status-ok" : "") + '">' + (medRec ? "✓" : "☐") + '</td>' +
       '<td class="' + (vte ? "print-status-ok" : "") + '">' + (vte ? "✓" : "☐") + '</td>' +
       '<td class="' + (sup ? "print-status-ok" : "") + '">' + (sup ? "✓" : "☐") + '</td>' +
@@ -1715,7 +1715,7 @@
 
     html += '<div class="print-section">';
     html += '<table class="print-table print-rounds-table"><thead><tr>' +
-      '<th>Patient</th><th style="width:130px;">Dx</th><th>Med Rec</th><th>VTE</th><th>SUP</th><th>CrCl</th><th>Monitoring</th><th>To Do</th>' +
+      '<th>Patient</th><th style="width:260px;">Dx</th><th>Med Rec</th><th>VTE</th><th>SUP</th><th>CrCl</th><th>Monitoring</th><th>To Do</th>' +
     '</tr></thead><tbody>';
     list.forEach(function(p){ html += buildRoundsPrintRow(p); });
     html += '</tbody></table></div>';
