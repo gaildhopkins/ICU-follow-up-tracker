@@ -1108,7 +1108,7 @@
     if(p.workupOtherDrugCoverage === "N"){
       var coverageSourceId = "other-drugcoverage";
       if(openSourceIds.indexOf(coverageSourceId) === -1){
-        p.tasks.push({ id: uid(), text: "Verify", area: "Other", due: "", priority: "routine", done: false, sourceItem: coverageSourceId });
+        p.tasks.push({ id: uid(), text: "Drug Coverage", area: "Other", due: "", priority: "routine", done: false, sourceItem: coverageSourceId });
         added++;
       }
     }
@@ -2021,7 +2021,7 @@
 
     return '<tr>' +
       '<td>' + escapeHtml(p.name) + '<div class="print-dim" style="margin-top:2px;">Room ' + escapeHtml(p.room || "—") + '</div>' + statusCell + '</td>' +
-      '<td style="max-width:260px; word-wrap:break-word;">' + dxCell + '</td>' +
+      '<td style="max-width:170px; word-wrap:break-word;">' + dxCell + '</td>' +
       '<td class="print-focus-cell">' + focusCell + '</td>' +
       '<td>' + todoCell + '</td>' +
     '</tr>';
@@ -2041,7 +2041,7 @@
 
     html += '<div class="print-section">';
     html += '<table class="print-table print-rounds-table"><thead><tr>' +
-      '<th>Patient</th><th style="width:260px;">Dx</th><th>Monitoring</th><th>To Do</th>' +
+      '<th>Patient</th><th style="width:170px;">Dx</th><th>Monitoring</th><th>To Do</th>' +
     '</tr></thead><tbody>';
     list.forEach(function(p){ html += buildRoundsPrintRow(p); });
     html += '</tbody></table></div>';
